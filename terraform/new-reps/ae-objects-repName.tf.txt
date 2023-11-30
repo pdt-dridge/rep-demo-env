@@ -1,0 +1,472 @@
+/* 
+  PagerDuty Services, Integrations, Dependencies, and Event Orchestrations
+  - https://www.terraform.io/docs/providers/pagerduty/r/business_service.html
+  - https://www.terraform.io/docs/providers/pagerduty/r/service.html
+  - https://www.terraform.io/docs/providers/pagerduty/r/service_dependency.html
+  - https://www.terraform.io/docs/providers/pagerduty/r/service_integration.html
+  - https://www.terraform.io/docs/providers/pagerduty/r/event_orchestration_router.html
+*/
+
+
+data "pagerduty_user" "repName" {
+  email = "rep-email"
+}
+
+
+/* 
+  Team for the Reps' Services
+*/
+resource "pagerduty_team" "repName_team" {
+  name        = "[repName] Engineering"
+  description = "repName Engineering Team"
+}
+
+/* 
+  Escalation Policy for the Reps' Service
+*/
+resource "pagerduty_escalation_policy" "repName_ep1" {
+  name      = "[repName] Engineering On-call"
+  teams     = [pagerduty_team.repName_team.id]
+
+  rule {
+    escalation_delay_in_minutes = 2
+    target {
+      type = "schedule_reference"
+      id   = pagerduty_schedule.repName_primary.id 
+    }
+  }
+  rule {
+    escalation_delay_in_minutes = 2
+    target {
+      type = "schedule_reference"
+      id   = pagerduty_schedule.repName_secondary.id 
+    }
+  }
+  rule {
+    escalation_delay_in_minutes = 2
+    target {
+      type = "user_reference"
+      id   = data.pagerduty_user.repName.id
+    }
+  }
+}
+
+/* 
+  Escalation Policy for the Reps' Other Services
+*/
+resource "pagerduty_escalation_policy" "repName_ep_support" {
+  name      = "[repName] API Support On-call"
+  teams     = [pagerduty_team.repName_team.id]
+
+  rule {
+    escalation_delay_in_minutes = 15
+    target {
+      type = "schedule_reference"
+      id   = pagerduty_schedule.repName_secondary.id 
+    }
+  }
+  rule {
+    escalation_delay_in_minutes = 15
+    target {
+      type = "schedule_reference"
+      id   = pagerduty_schedule.repName_primary.id 
+    }
+  }
+}
+
+
+/* 
+  Business Services (e.g. higher-level business application)
+*/
+resource "pagerduty_business_service" "online_purchase_repName" {
+  name             = "Online Purchasing [repName]"
+  description      = "Transactions and Payments through website and apps"
+}
+
+/* 
+  Technical Services (e.g. lower-level microservices)
+*/
+resource "pagerduty_service" "repName_payment_api" {
+  name                    = "[repName] Payments API"
+  auto_resolve_timeout    = 14400
+  acknowledgement_timeout = "null"
+  escalation_policy       = pagerduty_escalation_policy.repName_ep1.id
+  alert_creation          = "create_alerts_and_incidents"
+  alert_grouping_parameters {
+    type    = "intelligent"
+  }
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+  auto_pause_notifications_parameters {
+    enabled = true
+    timeout = 300
+  }
+}
+
+resource "pagerduty_service" "repName_cart_api" {
+  name                    = "[repName] Shopping Cart API"
+  auto_resolve_timeout    = 14400
+  acknowledgement_timeout = "null"
+  escalation_policy       = pagerduty_escalation_policy.repName_ep_support.id
+  alert_creation          = "create_alerts_and_incidents"
+  alert_grouping_parameters {
+    type    = "intelligent"
+  }
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+  auto_pause_notifications_parameters {
+    enabled = true
+    timeout = 300
+  }
+}
+
+resource "pagerduty_service" "repName_api_platform" {
+  name                    = "[repName] API Platform"
+  auto_resolve_timeout    = 14400
+  acknowledgement_timeout = "null"
+  escalation_policy       = pagerduty_escalation_policy.repName_ep_support.id
+  alert_creation          = "create_alerts_and_incidents"
+  alert_grouping_parameters {
+    type    = "intelligent"
+  }
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+  auto_pause_notifications_parameters {
+    enabled = true
+    timeout = 300
+  }
+}
+
+resource "pagerduty_service" "repName_login_api" {
+  name                    = "[repName] Login API"
+  auto_resolve_timeout    = 14400
+  acknowledgement_timeout = "null"
+  escalation_policy       = pagerduty_escalation_policy.repName_ep1.id
+  alert_creation          = "create_alerts_and_incidents"
+  alert_grouping_parameters {
+    type    = "intelligent"
+  }
+  incident_urgency_rule {
+    type    = "constant"
+    urgency = "severity_based"
+  }
+  auto_pause_notifications_parameters {
+    enabled = true
+    timeout = 300
+  }
+}
+
+
+/* 
+  Service-Level Integration Keys (Events v2)
+*/
+resource "pagerduty_service_integration" "repName_payment_api" {
+  name    = "Events API v2"
+  type    = "events_api_v2_inbound_integration"
+  service = pagerduty_service.repName_payment_api.id
+}
+
+resource "pagerduty_service_integration" "repName_gitlab_payments" {
+  name    = data.pagerduty_vendor.gitlab.name
+  service = pagerduty_service.repName_payment_api.id
+  vendor  = data.pagerduty_vendor.gitlab.id
+}
+
+resource "pagerduty_service_integration" "repName_api_platform" {
+  name    = "Events API v2"
+  type    = "events_api_v2_inbound_integration"
+  service = pagerduty_service.repName_api_platform.id
+}
+
+resource "pagerduty_service_integration" "repName_jenkins_platform" {
+  name    = data.pagerduty_vendor.jenkins.name
+  service = pagerduty_service.repName_api_platform.id
+  vendor  = data.pagerduty_vendor.jenkins.id
+}
+
+resource "pagerduty_service_integration" "repName_login_api" {
+  name    = "Events API v2"
+  type    = "events_api_v2_inbound_integration"
+  service = pagerduty_service.repName_login_api.id
+}
+
+resource "pagerduty_service_integration" "repName_cart_api" {
+  name    = "Events API v2"
+  type    = "events_api_v2_inbound_integration"
+  service = pagerduty_service.repName_cart_api.id
+}
+
+
+/* 
+  Tech Service -> Business Service Dependencies
+*/
+resource "pagerduty_service_dependency" "repName_payment_to_business" {
+    dependency {
+        dependent_service {
+            id = pagerduty_business_service.online_purchase_repName.id
+            type = "business_service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_payment_api.id
+            type = "service"
+        }
+    }
+}
+resource "pagerduty_service_dependency" "repName_login_to_business" {
+    dependency {
+        dependent_service {
+            id = pagerduty_business_service.online_purchase_repName.id
+            type = "business_service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_login_api.id
+            type = "service"
+        }
+    }
+}
+resource "pagerduty_service_dependency" "repName_cart_to_business" {
+    dependency {
+        dependent_service {
+            id = pagerduty_business_service.online_purchase_repName.id
+            type = "business_service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_cart_api.id
+            type = "service"
+        }
+    }
+}
+
+/* 
+  Tech Service -> Tech Service Dependencies
+*/
+resource "pagerduty_service_dependency" "repName_api_to_payment" {
+    dependency {
+        dependent_service {
+            id = pagerduty_service.repName_payment_api.id
+            type = "service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_api_platform.id
+            type = "service"
+        }
+    }
+}
+resource "pagerduty_service_dependency" "repName_api_to_login" {
+    dependency {
+        dependent_service {
+            id = pagerduty_service.repName_login_api.id
+            type = "service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_api_platform.id
+            type = "service"
+        }
+    }
+}
+resource "pagerduty_service_dependency" "repName_api_to_cart" {
+    dependency {
+        dependent_service {
+            id = pagerduty_service.repName_cart_api.id
+            type = "service"
+        }
+        supporting_service {
+            id = pagerduty_service.repName_api_platform.id
+            type = "service"
+        }
+    }
+}
+
+
+resource "pagerduty_schedule" "repName_primary" {
+  name      = "repName Engineering Primary"
+  time_zone = "Australia/Sydney"
+
+  layer {
+    name                         = "24-7 Roster"
+    start                        = "2022-11-06T20:00:00-05:00"
+    rotation_virtual_start       = "2022-11-06T20:00:00-05:00"
+    rotation_turn_length_seconds = 172800
+    users   = [
+        data.pagerduty_user.kate_miller.id,
+        data.pagerduty_user.rob_smith.id,
+        data.pagerduty_user.chelsea_west.id,
+        data.pagerduty_user.alex_baker.id
+    ]
+  }
+
+  teams = [pagerduty_team.repName_team.id]
+}
+
+resource "pagerduty_schedule" "repName_secondary" {
+  name      = "repName Engineering Secondary"
+  time_zone = "Australia/Sydney"
+
+  layer {
+    name                         = "24-7 Roster"
+    start                        = "2022-11-06T20:00:00-05:00"
+    rotation_virtual_start       = "2022-11-06T20:00:00-05:00"
+    rotation_turn_length_seconds = 172800
+    users   = [
+        data.pagerduty_user.kate_miller.id,
+        data.pagerduty_user.rob_smith.id,
+        data.pagerduty_user.chelsea_west.id,
+        data.pagerduty_user.alex_baker.id
+    ]
+  }
+
+  teams = [pagerduty_team.repName_team.id]
+}
+
+
+/* 
+  Event Orchestration
+*/
+resource "pagerduty_event_orchestration" "repName_orch" {
+  name = "repName Engineering Services"
+  description = "Consume Events and Process for repName Engineering"
+  team = pagerduty_team.repName_team.id
+}
+
+resource "pagerduty_event_orchestration_router" "repName_orch_router" {
+  event_orchestration = pagerduty_event_orchestration.repName_orch.id
+  set {
+    id = "start"
+    rule {
+      label = "Payment Alert"
+      condition {
+        expression = "event.source matches part 'payment-api'"
+      }
+      actions {
+        route_to = pagerduty_service.repName_payment_api.id
+      }
+    }
+    rule {
+      label = "Login Alert"
+      condition {
+        expression = "event.source matches part 'login-api'"
+      }
+      actions {
+        route_to = pagerduty_service.repName_login_api.id
+      }
+    }
+    rule {
+      label = "Shopping Cart Alert"
+      condition {
+        expression = "event.source matches part 'cart-api'"
+      }
+      actions {
+        route_to = pagerduty_service.repName_cart_api.id
+      }
+    }    
+    rule {
+      label = "API Platform Alert"
+      condition {
+        expression = "event.source matches part 'api-platform'"
+      }
+      actions {
+        route_to = pagerduty_service.repName_api_platform.id
+      }
+    }
+  }
+  catch_all {
+    actions {
+      route_to = "unrouted"
+    }
+  }
+}
+
+resource "pagerduty_event_orchestration_service" "repName_payment_orch" {
+  service = pagerduty_service.repName_payment_api.id
+  enable_event_orchestration_for_service = true
+  set {
+    id = "start"
+    rule {
+      label = "If Major -> Set to P2"
+      condition {
+        expression = "event.source matches part 'payment-api'"
+      }
+      actions {
+        annotate = "Incident Priority set by Event Orchestration"
+        priority = data.pagerduty_priority.p2.id
+
+        # Id of the next set
+        route_to = "step-two"
+      }
+    }
+  }
+  set {
+    id = "step-two"
+    rule {
+      label = "Inject Runbook Instructions"
+
+      actions {
+        extraction {
+          # adding runbook step instructions
+          template = "INCIDENT TRIAGE PROCESS:\n\nStep 1: Check all the systems for alerts\nhttps://response.pagerduty.com/\n\nStep 2: Note all failing alerts\nhttps://goingoncall.pagerduty.com/\n\nStep 3: Isolate and deactivate failing systems\nhttps://ownership.pagerduty.com/\n\nStep 4: Update Stakeholders\nhttps://stakeholders.pagerduty.com/"
+          target = "event.custom_details['Incident Runbook']"
+        }
+      }
+    }
+  }
+  catch_all {
+    actions { }
+  }
+}
+
+# Linking Services to system_diagnostic Automation Action
+
+resource "pagerduty_automation_actions_action_service_association" "repName_payment_system_diagnostic" {
+  action_id = data.pagerduty_automation_actions_action.system_diagnostic.id
+  service_id   = pagerduty_service.repName_payment_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_login_system_diagnostic" {
+  action_id = data.pagerduty_automation_actions_action.system_diagnostic.id
+  service_id   = pagerduty_service.repName_login_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_platform_system_diagnostic" {
+  action_id = data.pagerduty_automation_actions_action.system_diagnostic.id
+  service_id   = pagerduty_service.repName_api_platform.id
+}
+
+# Linking Services to clear_disk Automation Action
+
+resource "pagerduty_automation_actions_action_service_association" "repName_payment_clear_disk" {
+  action_id = data.pagerduty_automation_actions_action.clear_disk.id
+  service_id   = pagerduty_service.repName_payment_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_login_clear_disk" {
+  action_id = data.pagerduty_automation_actions_action.clear_disk.id
+  service_id   = pagerduty_service.repName_login_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_platform_clear_disk" {
+  action_id = data.pagerduty_automation_actions_action.clear_disk.id
+  service_id   = pagerduty_service.repName_api_platform.id
+}
+
+# Linking Services to reload_webserver Automation Action
+
+resource "pagerduty_automation_actions_action_service_association" "repName_payment_reload_webserver" {
+  action_id = data.pagerduty_automation_actions_action.reload_webserver.id
+  service_id   = pagerduty_service.repName_payment_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_login_reload_webserver" {
+  action_id = data.pagerduty_automation_actions_action.reload_webserver.id
+  service_id   = pagerduty_service.repName_login_api.id
+}
+
+resource "pagerduty_automation_actions_action_service_association" "repName_platform_reload_webserver" {
+  action_id = data.pagerduty_automation_actions_action.reload_webserver.id
+  service_id   = pagerduty_service.repName_api_platform.id
+}
