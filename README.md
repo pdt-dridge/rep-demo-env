@@ -5,9 +5,10 @@ There are two separate Terraform configs here; the base config and the rep confi
 
 In each folder you will need to:  
 `terraform init`  
-`terraform apply -var="PAGERDUTY_TOKEN=TOKEN_HERE`
+`terraform apply -var="PAGERDUTY_TOKEN=TOKEN_HERE"`
 
-This will create a state file for each config and allows you to update and change the base config without affecting the reps TF State and vice versa.
+This will create a `.tfstate` file for each config.  
+The separated config allows you to update and change the base config without affecting the reps TF State and vice versa.  
 This is useful where reps have manually changed some of the config controlled by Terraform.
 
 <b>For the base config:</b>  
